@@ -1,0 +1,181 @@
+---
+title: "Thesis"
+author: "Alexander Jansink"
+date: "2024-04-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+### Load Apollo library
+library(apollo)
+
+### Initialise code
+apollo_initialise()
+
+### Set core controls
+apollo_control = list(
+  modelName  ="Model", # Name of the output file
+  modelDescr ="MNL model for robot advisory thesis", #info for output file
+  indivID    ="ID" # Name of the identifying column! 
+)
+```
+
+
+```{r}
+#### LOAD DATA
+database = read.csv("Long_W_Effect") # needs to be called database!
+```
+
+```{r}
+### Vector of parameters, including any that are kept fixed in estimation
+apollo_beta=c(
+              #Main effects
+              BETA_Advice_Prof   = 0,
+              BETA_Advice_Thumps   = 0,
+              BETA_Advice_Graph   = 0,
+              BETA_Advice_AI   = 0,
+              BETA_Opinion1   = 0,
+              BETA_Opinion2   = 0,
+              BETA_Amount  = 0,
+              
+              #Interaction effects
+              BETA_Int_Amount_Prof = 0,
+              BETA_Int_Amount_Thumps = 0,
+              BETA_Int_Amount_Graph = 0,
+              BETA_Int_Amount_AI = 0,
+              BETA_Int_Amount_Op1 = 0,
+              BETA_Int_Amount_Op2 = 0,
+              BETA_Int_Op1_Prof   = 0,
+              BETA_Int_Op2_Prof   = 0,
+              BETA_Int_Op1_Thumps   = 0,
+              BETA_Int_Op2_Thumps   = 0,
+              BETA_Int_Op1_Graph   = 0,
+              BETA_Int_Op2_Graph   = 0,
+              BETA_Int_Op1_AI   = 0,
+              BETA_Int_Op2_AI   = 0
+              
+              )
+
+### Vector with names (in this case none) of parameters to be kept fixed at their starting value in apollo_beta
+apollo_fixed = c()
+
+# Validates inputs and checks whether they are correct
+apollo_inputs=apollo_validateInputs()
+
+```
+
+```{r}
+#### DEFINE MODEL AND LIKELIHOOD FUNCTION 
+
+apollo_probabilities=function(apollo_beta, apollo_inputs, functionality="estimate"){
+  
+  ### Attach inputs and detach after function exit
+  apollo_attach(apollo_beta, apollo_inputs)
+  on.exit(apollo_detach(apollo_beta, apollo_inputs))
+  
+  ### Create list of probabilities P
+  P = list()
+  
+  ### List of utilities: these must use the same names as in mnl_settings, order is irrelevant
+  # option1.trust,option1.cost,option2.method,option2.trust,option2.cost
+
+  V = list()
+    V[['A']]  = 
+                # Main effect of the option
+                option1.method.effect_1 * BETA_Advice_Prof +
+                option1.method.effect_2 * BETA_Advice_Thumps +
+                option1.method.effect_3 * BETA_Advice_Graph +
+                option1.method.effect_4 * BETA_Advice_AI +
+                option1.cost * BETA_Amount +
+                option1.trust.effect_1 * BETA_Opinion1 +
+                option1.trust.effect_2 * BETA_Opinion2 +
+                
+                # The interaction effects of the option
+                # Interaction between advice and amount
+                option1.method.effect_1 * option1.cost * BETA_Int_Amount_Prof +
+                option1.method.effect_2 * option1.cost * BETA_Int_Amount_Thumps +
+                option1.method.effect_3 * option1.cost * BETA_Int_Amount_Graph +
+                option1.method.effect_4 * option1.cost * BETA_Int_Amount_AI +
+                
+                # Interaction between advice and opinion
+                option1.method.effect_1 * option1.trust.effect_1 * BETA_Int_Op1_Prof+
+                option1.method.effect_1 * option1.trust.effect_2 * BETA_Int_Op2_Prof+
+                option1.method.effect_2 * option1.trust.effect_1 * BETA_Int_Op1_Thumps+
+                option1.method.effect_2 * option1.trust.effect_2 * BETA_Int_Op2_Thumps+
+                option1.method.effect_3 * option1.trust.effect_1 * BETA_Int_Op1_Graph+
+                option1.method.effect_3 * option1.trust.effect_2 * BETA_Int_Op2_Graph+
+                option1.method.effect_4 * option1.trust.effect_1 * BETA_Int_Op1_AI+
+                option1.method.effect_4 * option1.trust.effect_2 * BETA_Int_Op2_AI+
+      
+                # Intereaction between Opinion and advice
+                option1.trust.effect_1 * option1.cost * BETA_Int_Amount_Op1+
+                option1.trust.effect_2 * option1.cost * BETA_Int_Amount_Op2
+    
+    V[['B']]  = # Main effect
+                option2.method.effect_1 * BETA_Advice_Prof +
+                option2.method.effect_2 * BETA_Advice_Thumps +
+                option2.method.effect_3 * BETA_Advice_Graph +
+                option2.method.effect_4 * BETA_Advice_AI +
+                option2.cost * BETA_Amount +
+                option2.trust.effect_1 * BETA_Opinion1 +
+                option2.trust.effect_2 * BETA_Opinion2 +
+      
+                # The interaction effects of the option
+                # Interaction between advice and amount
+                option2.method.effect_1 * option2.cost * BETA_Int_Amount_Prof +
+                option2.method.effect_2 * option2.cost * BETA_Int_Amount_Thumps +
+                option2.method.effect_3 * option2.cost * BETA_Int_Amount_Graph +
+                option2.method.effect_4 * option2.cost * BETA_Int_Amount_AI +
+                
+                # Interaction between advice and opinion
+                option2.method.effect_1 * option2.trust.effect_1 * BETA_Int_Op1_Prof+
+                option2.method.effect_1 * option2.trust.effect_2 * BETA_Int_Op2_Prof+
+                option2.method.effect_2 * option2.trust.effect_1 * BETA_Int_Op1_Thumps+
+                option2.method.effect_2 * option2.trust.effect_2 * BETA_Int_Op2_Thumps+
+                option2.method.effect_3 * option2.trust.effect_1 * BETA_Int_Op1_Graph+
+                option2.method.effect_3 * option2.trust.effect_2 * BETA_Int_Op2_Graph+
+                option2.method.effect_4 * option2.trust.effect_1 * BETA_Int_Op1_AI+
+                option2.method.effect_4 * option2.trust.effect_2 * BETA_Int_Op2_AI+
+      
+                # Intereaction between Opinion and advice
+                option2.trust.effect_1 * option2.cost * BETA_Int_Amount_Op1+
+                option2.trust.effect_2 * option2.cost * BETA_Int_Amount_Op2
+    
+    ### Define settings for MNL model component
+    mnl_settings = list(
+      alternatives  = c(A=1, B=2), 
+      avail         = 1,
+      choiceVar     = SC,
+      V             = V
+    )
+  
+  ### Compute probabilities using MNL model
+  P[['model']] = apollo_mnl(mnl_settings, functionality)
+  
+  ### Take product across observation for same individual
+  P = apollo_panelProd(P, apollo_inputs, functionality)
+  
+  ### Prepare and return outputs of func  tion
+  P = apollo_prepareProb(P, apollo_inputs, functionality)
+  return(P)
+}
+```
+
+```{r}
+#### MODEL ESTIMATION 
+model = apollo_estimate(apollo_beta, apollo_fixed, apollo_probabilities, apollo_inputs)
+
+
+#### MODEL OUTPUTS
+apollo_modelOutput(model,modelOutput_settings=list(printPVal=TRUE))
+
+apollo_saveOutput(model)
+
+```
+
+```{r}
+apollo_modelOutput(model, modelOutput_settings = list(printPVal=2)) # for two sided t-test
+
+```
+
